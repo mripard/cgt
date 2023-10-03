@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro_error::{emit_error, proc_macro_error};
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse::Parse, parse_macro_input, Expr, ItemFn, Token};
 
 #[proc_macro]
 pub fn cgt_assert(item: TokenStream) -> TokenStream {
@@ -10,6 +10,37 @@ pub fn cgt_assert(item: TokenStream) -> TokenStream {
     quote! {
         if !(#input) {
             return Err(TestError::ConditionUnmet(stringify!(#input).to_string()));
+        }
+    }
+    .into()
+}
+
+#[allow(dead_code)]
+struct AssertionInput {
+    left: Expr,
+    comma: Token![,],
+    right: Expr,
+}
+
+impl Parse for AssertionInput {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            left: input.parse()?,
+            comma: input.parse()?,
+            right: input.parse()?,
+        })
+    }
+}
+
+#[proc_macro]
+pub fn cgt_assert_eq(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as AssertionInput);
+    let left = &input.left;
+    let right = &input.right;
+
+    quote! {
+        if (#left) != (#right) {
+            return Err(TestError::NotEqual(format!("{:#?}", #left), format!("{:#?}", #right)));
         }
     }
     .into()

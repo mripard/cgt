@@ -16,6 +16,9 @@ pub enum TestError {
     #[error("I/O Error")]
     Io(#[from] std::io::Error),
 
+    #[error("Values {0} and {1} are not equal")]
+    NotEqual(String, String),
+
     #[error("Unknown Error")]
     Unspecified,
 }
@@ -25,6 +28,7 @@ impl PartialEq for TestError {
         match (self, other) {
             (Self::ConditionUnmet(l0), Self::ConditionUnmet(r0)) => l0 == r0,
             (Self::Io(l0), Self::Io(r0)) => l0.raw_os_error() == r0.raw_os_error(),
+            (Self::NotEqual(l0, l1), Self::NotEqual(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::Unspecified, Self::Unspecified) => true,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
