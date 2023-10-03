@@ -1,4 +1,9 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs::File,
+    os::fd::{AsFd, BorrowedFd},
+    path::Path,
+};
 
 use testanything::tap_writer::TapWriter;
 use thiserror::Error;
@@ -41,6 +46,7 @@ impl From<nix::Error> for TestError {
 #[derive(Clone, Debug)]
 pub enum TestFunction {
     NoArg(fn() -> Result<(), TestError>),
+    WithFd(fn(BorrowedFd) -> Result<(), TestError>),
 }
 
 #[derive(Clone, Debug)]
@@ -66,7 +72,7 @@ fn get_test_suites() -> HashMap<String, Vec<Test>> {
     map
 }
 
-pub fn run_all() {
+pub fn run_all(dev: &Path) {
     for (test_module, tests) in get_test_suites() {
         let writer = TapWriter::new(&test_module);
         let mut num = 0;
@@ -78,6 +84,9 @@ pub fn run_all() {
 
             let res = match test.test_fn {
                 TestFunction::NoArg(f) => f(),
+                TestFunction::WithFd(f) => File::open(dev)
+                    .map_err(|e| e.into())
+                    .and_then(|file| f(file.as_fd())),
             };
 
             match res {

@@ -7,10 +7,12 @@
 #![allow(clippy::unnecessary_wraps)]
 #![doc = include_str!("../README.md")]
 
+use std::path::PathBuf;
+
 use cgt_core::run_all;
 
 mod tests;
 
 fn main() {
-    run_all();
+    run_all(&PathBuf::from("/dev/dri/card0"));
 }
