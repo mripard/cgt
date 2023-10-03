@@ -8,6 +8,9 @@ pub enum TestError {
     #[error("Condition {0} is not true")]
     ConditionUnmet(String),
 
+    #[error("I/O Error")]
+    Io(#[from] std::io::Error),
+
     #[error("Unknown Error")]
     Unspecified,
 }
@@ -16,8 +19,21 @@ impl PartialEq for TestError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::ConditionUnmet(l0), Self::ConditionUnmet(r0)) => l0 == r0,
+            (Self::Io(l0), Self::Io(r0)) => l0.raw_os_error() == r0.raw_os_error(),
             (Self::Unspecified, Self::Unspecified) => true,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl From<nix::Error> for TestError {
+    fn from(value: nix::Error) -> Self {
+        let io_err: Result<std::io::Error, _> = value.try_into();
+
+        if let Ok(err) = io_err {
+            err.into()
+        } else {
+            TestError::Unspecified
         }
     }
 }
