@@ -19,6 +19,12 @@ pub enum TestError {
     #[error("Values {0} and {1} are not equal")]
     NotEqual(String, String),
 
+    #[error("Result {0} isn't an error")]
+    ResultNotError(String),
+
+    #[error("Result {0} isn't a value")]
+    ResultNotOk(String),
+
     #[error("Unknown Error")]
     Unspecified,
 }
@@ -29,6 +35,8 @@ impl PartialEq for TestError {
             (Self::ConditionUnmet(l0), Self::ConditionUnmet(r0)) => l0 == r0,
             (Self::Io(l0), Self::Io(r0)) => l0.raw_os_error() == r0.raw_os_error(),
             (Self::NotEqual(l0, l1), Self::NotEqual(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::ResultNotError(l0), Self::ResultNotError(r0)) => l0 == r0,
+            (Self::ResultNotOk(l0), Self::ResultNotOk(r0)) => l0 == r0,
             (Self::Unspecified, Self::Unspecified) => true,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }

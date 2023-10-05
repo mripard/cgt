@@ -15,6 +15,30 @@ pub fn cgt_assert(item: TokenStream) -> TokenStream {
     .into()
 }
 
+#[proc_macro]
+pub fn cgt_assert_err(item: TokenStream) -> TokenStream {
+    let input: proc_macro2::TokenStream = item.into();
+
+    quote! {
+        if !(#input).is_err() {
+            return Err(TestError::ResultNotOk(format!("{:#?}", (#input))));
+        }
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn cgt_assert_ok(item: TokenStream) -> TokenStream {
+    let input: proc_macro2::TokenStream = item.into();
+
+    quote! {
+        if !(#input).is_ok() {
+            return Err(TestError::ResultNotOk(format!("{:#?}", (#input))));
+        }
+    }
+    .into()
+}
+
 #[allow(dead_code)]
 struct AssertionInput {
     left: Expr,
