@@ -1,14 +1,10 @@
 [package]
-name = "cgt-core"
+name = "drm-helpers"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-drm-helpers = { path = "../drm-helpers" }
 drm-uapi = { path = "../drm-uapi" }
-inventory = "0.3.12"
-nix = "0.27.1"
-testanything = "0.4.1"
-thiserror = "1.0.49"
+strum = "0.25.0"

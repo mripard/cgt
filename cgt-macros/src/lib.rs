@@ -91,6 +91,8 @@ pub fn cgt_test(args: TokenStream, item: TokenStream) -> TokenStream {
                 module_name: module_path!(),
                 test_name: #fn_name,
                 test_fn: cgt_core::TestFunction::NoArg(#fn_ident),
+                master: false,
+                client_capabilities: [None; 8],
             }
         );
     }
@@ -111,6 +113,8 @@ pub fn cgt_test_with_fd(_args: TokenStream, item: TokenStream) -> TokenStream {
                 module_name: module_path!(),
                 test_name: #fn_name,
                 test_fn: TestFunction::WithFd(#fn_ident),
+                master: false,
+                client_capabilities: [None; 8],
             }
         );
     }

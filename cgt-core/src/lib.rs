@@ -5,8 +5,11 @@ use std::{
     path::Path,
 };
 
+use drm_helpers::{set_client_capability, set_master};
 use testanything::tap_writer::TapWriter;
 use thiserror::Error;
+
+use drm_uapi::ClientCapability;
 
 #[derive(Debug, Error)]
 pub enum TestError {
@@ -66,6 +69,8 @@ pub struct Test {
     pub module_name: &'static str,
     pub test_name: &'static str,
     pub test_fn: TestFunction,
+    pub master: bool,
+    pub client_capabilities: [Option<ClientCapability>; 8],
 }
 
 inventory::collect!(Test);
@@ -96,9 +101,19 @@ pub fn run_all(dev: &Path) {
 
             let res = match test.test_fn {
                 TestFunction::NoArg(f) => f(),
-                TestFunction::WithFd(f) => File::open(dev)
-                    .map_err(|e| e.into())
-                    .and_then(|file| f(file.as_fd())),
+                TestFunction::WithFd(f) => File::open(dev).map_err(|e| e.into()).and_then(|file| {
+                    let fd = file.as_fd();
+
+                    if test.master {
+                        set_master(fd)?;
+                    }
+
+                    for cap in test.client_capabilities.into_iter().flatten() {
+                        set_client_capability(fd, cap)?;
+                    }
+
+                    f(file.as_fd())
+                }),
             };
 
             match res {
