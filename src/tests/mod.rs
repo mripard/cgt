@@ -3,6 +3,7 @@ mod prelude {
 
     pub use cgt_core::TestError;
     pub use cgt_macros::*;
+    pub use drm_uapi::{ClientCapability::*, *};
 }
 
 automod::dir!("src/tests");

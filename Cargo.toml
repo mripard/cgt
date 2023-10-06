@@ -15,10 +15,12 @@ edition = "2021"
 members = [
     "cgt-core",
     "cgt-macros",
+    "drm-uapi",
 ]
 
 [dependencies]
 automod = "1.0.12"
 cgt-core = { path = "cgt-core" }
 cgt-macros = { path = "cgt-macros" }
+drm-uapi = { path = "drm-uapi" }
 inventory = "0.3.12"
