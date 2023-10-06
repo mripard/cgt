@@ -1,5 +1,9 @@
 mod prelude {
-    pub use std::os::fd::{AsRawFd, BorrowedFd};
+    pub use std::{
+        fs::File,
+        os::fd::{AsRawFd, BorrowedFd},
+        path::Path,
+    };
 
     pub use cgt_core::TestError;
     pub use cgt_macros::*;

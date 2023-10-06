@@ -62,6 +62,7 @@ impl From<nix::Error> for TestError {
 pub enum TestFunction {
     NoArg(fn() -> Result<(), TestError>),
     WithFd(fn(BorrowedFd) -> Result<(), TestError>),
+    WithPath(fn(&Path) -> Result<(), TestError>),
 }
 
 #[derive(Clone, Debug)]
@@ -114,6 +115,7 @@ pub fn run_all(dev: &Path) {
 
                     f(file.as_fd())
                 }),
+                TestFunction::WithPath(f) => f(dev),
             };
 
             match res {

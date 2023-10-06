@@ -100,6 +100,34 @@ pub fn cgt_test(args: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+#[proc_macro_attribute]
+pub fn cgt_test_with_path(args: TokenStream, item: TokenStream) -> TokenStream {
+    if !args.is_empty() {
+        let args: proc_macro2::TokenStream = args.into();
+
+        emit_error! { args, "This macro doesn't use any attribute" };
+    }
+
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_ident = &input.sig.ident;
+    let fn_name = fn_ident.to_string();
+
+    quote! {
+        #input
+
+        inventory::submit!(
+            cgt_core::Test {
+                module_name: module_path!(),
+                test_name: #fn_name,
+                test_fn: cgt_core::TestFunction::WithPath(#fn_ident),
+                master: false,
+                client_capabilities: [None; 8],
+            }
+        );
+    }
+    .into()
+}
+
 #[derive(Debug, FromAttr)]
 struct TestAttributes {
     master: bool,
