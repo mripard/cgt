@@ -1,0 +1,5 @@
+error: expected square brackets
+ --> tests/trybuild/failures/cgt_test_fd_wrong_caps_type.rs:1:47
+  |
+1 | #[cgt_macros::cgt_test_with_fd(capabilities = "Wrong")]
+  |                                               ^^^^^^^

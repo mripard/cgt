@@ -1,0 +1,11 @@
+error: expected `fn`
+ --> tests/trybuild/failures/cgt_test_struct.rs:2:1
+  |
+2 | struct Dummy;
+  | ^^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+ --> tests/trybuild/failures/cgt_test_struct.rs:2:14
+  |
+2 | struct Dummy;
+  |              ^ consider adding a `main` function to `$DIR/tests/trybuild/failures/cgt_test_struct.rs`

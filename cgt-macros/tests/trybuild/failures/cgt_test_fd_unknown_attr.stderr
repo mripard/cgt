@@ -1,0 +1,5 @@
+error: supported fields are `master` and `capabilities`
+ --> tests/trybuild/failures/cgt_test_fd_unknown_attr.rs:1:32
+  |
+1 | #[cgt_macros::cgt_test_with_fd(unknown)]
+  |                                ^^^^^^^

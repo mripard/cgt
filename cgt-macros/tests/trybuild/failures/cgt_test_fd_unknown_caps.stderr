@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `Unknown` in this scope
+ --> tests/trybuild/failures/cgt_test_fd_unknown_caps.rs:1:46
+  |
+1 | #[cgt_macros::cgt_test_with_fd(capabilities=[Unknown])]
+  |                                              ^^^^^^^ not found in this scope

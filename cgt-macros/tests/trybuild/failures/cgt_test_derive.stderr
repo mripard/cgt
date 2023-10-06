@@ -1,0 +1,19 @@
+error: expected derive macro, found attribute macro `cgt_macros::cgt_test`
+ --> tests/trybuild/failures/cgt_test_derive.rs:1:10
+  |
+1 | #[derive(cgt_macros::cgt_test)]
+  |          ^^^^^^^^^^^^^^^^^^^^ not a derive macro
+  |
+help: remove from the surrounding `derive()`
+ --> tests/trybuild/failures/cgt_test_derive.rs:1:10
+  |
+1 | #[derive(cgt_macros::cgt_test)]
+  |          ^^^^^^^^^^^^^^^^^^^^
+  = help: add as non-Derive macro
+          `#[cgt_macros::cgt_test]`
+
+error[E0601]: `main` function not found in crate `$CRATE`
+ --> tests/trybuild/failures/cgt_test_derive.rs:2:14
+  |
+2 | struct Dummy;
+  |              ^ consider adding a `main` function to `$DIR/tests/trybuild/failures/cgt_test_derive.rs`

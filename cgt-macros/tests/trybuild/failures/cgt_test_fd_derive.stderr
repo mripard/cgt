@@ -1,0 +1,5 @@
+error: expected macro, found attribute macro `cgt_macros::cgt_test_with_fd`
+ --> tests/trybuild/failures/cgt_test_fd_derive.rs:2:5
+  |
+2 |     cgt_macros::cgt_test_with_fd!();
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not a macro

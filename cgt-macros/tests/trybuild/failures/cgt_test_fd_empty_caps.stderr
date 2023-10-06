@@ -1,0 +1,7 @@
+error: unexpected end of input, expected assignment `=`
+ --> tests/trybuild/failures/cgt_test_fd_empty_caps.rs:1:1
+  |
+1 | #[cgt_macros::cgt_test_with_fd(capabilities)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `cgt_macros::cgt_test_with_fd` (in Nightly builds, run with -Z macro-backtrace for more info)
