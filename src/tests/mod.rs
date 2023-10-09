@@ -1,7 +1,7 @@
 mod prelude {
     pub use std::{
         fs::File,
-        os::fd::{AsRawFd, BorrowedFd},
+        os::fd::{AsFd, AsRawFd, BorrowedFd},
         path::Path,
     };
 
