@@ -93,6 +93,24 @@ ioctl_readwrite!(
     drm_mode_get_plane_res
 );
 
+macro_rules! fourcc_code {
+    ($a:expr, $b:expr, $c:expr, $d:expr) => {
+        (($a as u32) | (($b as u32) << 8) | (($c as u32) << 16) | (($d as u32) << 24)) as u32
+    };
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Format {
+    XRGB8888 = fourcc_code!('X', 'R', '2', '4'),
+}
+
+impl Format {
+    pub fn into_u32(self) -> u32 {
+        self as u32
+    }
+}
+
 #[repr(C)]
 #[derive(Default, Debug)]
 pub struct drm_mode_get_plane {
