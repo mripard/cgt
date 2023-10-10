@@ -1,15 +1,16 @@
 use std::{
     collections::HashMap,
     fs::File,
-    os::fd::{AsFd, BorrowedFd},
-    path::Path,
+    os::fd::{AsFd, AsRawFd, BorrowedFd},
+    path::{Path, PathBuf},
 };
 
 use drm_helpers::{set_client_capability, set_master};
+use glob::glob;
 use testanything::tap_writer::TapWriter;
 use thiserror::Error;
 
-use drm_uapi::ClientCapability;
+use drm_uapi::{drm_ioctl_version, drm_version, ClientCapability};
 
 #[derive(Debug, Error)]
 pub enum TestError {
@@ -90,7 +91,55 @@ fn get_test_suites() -> HashMap<String, Vec<Test>> {
     map
 }
 
-pub fn run_all(dev: &Path) {
+pub enum DeviceSpecifier {
+    ModuleName(String),
+    Path(PathBuf),
+}
+
+fn find_device(dev: DeviceSpecifier) -> Result<PathBuf, TestError> {
+    match dev {
+        DeviceSpecifier::ModuleName(module) => {
+            for entry in glob("/dev/dri/card*").expect("Failed to read glob pattern") {
+                match entry {
+                    Ok(ref path) => {
+                        let f = File::open(path)?;
+
+                        let mut count = drm_version::default();
+
+                        unsafe { drm_ioctl_version(f.as_fd().as_raw_fd(), &mut count) }?;
+
+                        let mut name: Vec<u8> = Vec::with_capacity(count.name_len);
+
+                        let mut data = drm_version {
+                            name_len: count.name_len,
+                            name: name.as_mut_ptr() as u64,
+
+                            ..Default::default()
+                        };
+
+                        unsafe {
+                            drm_ioctl_version(f.as_fd().as_raw_fd(), &mut data)?;
+                            name.set_len(data.name_len);
+                        };
+
+                        if String::from_utf8_lossy(&name) == module {
+                            return Ok(path.clone());
+                        }
+                    }
+
+                    Err(e) => return Err(e.into_error().into()),
+                }
+            }
+
+            Err(nix::errno::Errno::ENODEV.into())
+        }
+        DeviceSpecifier::Path(p) => Ok(p),
+    }
+}
+
+pub fn run_all(dev: DeviceSpecifier) {
+    let path = find_device(dev).unwrap();
+
     for (test_module, tests) in get_test_suites() {
         let writer = TapWriter::new(&test_module);
         let mut num = 0;
@@ -102,20 +151,22 @@ pub fn run_all(dev: &Path) {
 
             let res = match test.test_fn {
                 TestFunction::NoArg(f) => f(),
-                TestFunction::WithFd(f) => File::open(dev).map_err(|e| e.into()).and_then(|file| {
-                    let fd = file.as_fd();
+                TestFunction::WithFd(f) => {
+                    File::open(&path).map_err(|e| e.into()).and_then(|file| {
+                        let fd = file.as_fd();
 
-                    if test.master {
-                        set_master(fd)?;
-                    }
+                        if test.master {
+                            set_master(fd)?;
+                        }
 
-                    for cap in test.client_capabilities.into_iter().flatten() {
-                        set_client_capability(fd, cap)?;
-                    }
+                        for cap in test.client_capabilities.into_iter().flatten() {
+                            set_client_capability(fd, cap)?;
+                        }
 
-                    f(file.as_fd())
-                }),
-                TestFunction::WithPath(f) => f(dev),
+                        f(file.as_fd())
+                    })
+                }
+                TestFunction::WithPath(f) => f(&path),
             };
 
             match res {

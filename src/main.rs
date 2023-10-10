@@ -7,12 +7,10 @@
 #![allow(clippy::unnecessary_wraps)]
 #![doc = include_str!("../README.md")]
 
-use std::path::PathBuf;
-
-use cgt_core::run_all;
+use cgt_core::{run_all, DeviceSpecifier};
 
 mod tests;
 
 fn main() {
-    run_all(&PathBuf::from("/dev/dri/card0"));
+    run_all(DeviceSpecifier::ModuleName(String::from("vkms")));
 }
