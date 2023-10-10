@@ -61,9 +61,9 @@ impl From<nix::Error> for TestError {
 
 #[derive(Clone, Debug)]
 pub enum TestFunction {
-    NoArg(fn() -> Result<(), TestError>),
-    WithFd(fn(BorrowedFd) -> Result<(), TestError>),
-    WithPath(fn(&Path) -> Result<(), TestError>),
+    NoArg(fn() -> TestResult),
+    WithFd(fn(BorrowedFd) -> TestResult),
+    WithPath(fn(&Path) -> TestResult),
 }
 
 #[derive(Clone, Debug)]
@@ -73,6 +73,35 @@ pub struct Test {
     pub test_fn: TestFunction,
     pub master: bool,
     pub client_capabilities: [Option<ClientCapability>; 8],
+}
+
+#[derive(PartialEq)]
+pub enum InnerResult<E> {
+    Success,
+    Failure(E),
+}
+
+impl<U, E, F> From<Result<U, E>> for InnerResult<F>
+where
+    F: From<E>,
+{
+    fn from(value: Result<U, E>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(e) => Self::Failure(Into::<F>::into(e)),
+        }
+    }
+}
+
+pub type TestResult = InnerResult<TestError>;
+
+impl std::fmt::Debug for TestResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::Success => write!(f, "Success"),
+            Self::Failure(e) => write!(f, "Failure: {}", e),
+        }
+    }
 }
 
 inventory::collect!(Test);
@@ -137,6 +166,31 @@ fn find_device(dev: DeviceSpecifier) -> Result<PathBuf, TestError> {
     }
 }
 
+fn run_one_fd_test(test: &Test, path: &Path, f: fn(BorrowedFd<'_>) -> TestResult) -> TestResult {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => return TestResult::Failure(e.into()),
+    };
+
+    let fd = file.as_fd();
+    if test.master {
+        let res = set_master(fd);
+        if res.is_err() {
+            return res.into();
+        }
+    }
+
+    for cap in test.client_capabilities.into_iter().flatten() {
+        let res = set_client_capability(fd, cap);
+
+        if res.is_err() {
+            return res.into();
+        }
+    }
+
+    f(file.as_fd())
+}
+
 pub fn run_all(dev: DeviceSpecifier) {
     let path = find_device(dev).unwrap();
 
@@ -151,27 +205,13 @@ pub fn run_all(dev: DeviceSpecifier) {
 
             let res = match test.test_fn {
                 TestFunction::NoArg(f) => f(),
-                TestFunction::WithFd(f) => {
-                    File::open(&path).map_err(|e| e.into()).and_then(|file| {
-                        let fd = file.as_fd();
-
-                        if test.master {
-                            set_master(fd)?;
-                        }
-
-                        for cap in test.client_capabilities.into_iter().flatten() {
-                            set_client_capability(fd, cap)?;
-                        }
-
-                        f(file.as_fd())
-                    })
-                }
+                TestFunction::WithFd(f) => run_one_fd_test(&test, &path, f),
                 TestFunction::WithPath(f) => f(&path),
             };
 
             match res {
-                Ok(_) => writer.ok(num, test.test_name),
-                Err(e) => {
+                TestResult::Success => writer.ok(num, test.test_name),
+                TestResult::Failure(e) => {
                     writer.not_ok(num, test.test_name);
                     writer.diagnostic(&e.to_string());
                 }
