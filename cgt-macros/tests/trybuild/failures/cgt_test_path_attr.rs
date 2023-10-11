@@ -1,5 +1,5 @@
-#[cgt_macros::cgt_test(attribute)]
-fn test() -> Result<(), cgt_core::TestError> {
+#[cgt_macros::cgt_test_with_path(attribute)]
+fn test(_: &Path) -> Result<(), cgt_core::TestError> {
     Ok(())
 }
 
