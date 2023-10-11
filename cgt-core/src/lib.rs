@@ -3,6 +3,7 @@ use std::{
     fs::File,
     os::fd::{AsFd, AsRawFd, BorrowedFd},
     path::{Path, PathBuf},
+    process::{ExitCode, Termination},
 };
 
 use drm_helpers::{set_client_capability, set_master};
@@ -79,6 +80,15 @@ pub struct Test {
 pub enum InnerResult<E> {
     Success,
     Failure(E),
+}
+
+impl<E> InnerResult<E> {
+    pub fn and(self, res: InnerResult<E>) -> InnerResult<E> {
+        match self {
+            InnerResult::Success => res,
+            InnerResult::Failure(_) => self,
+        }
+    }
 }
 
 impl<U, E, F> From<Result<U, E>> for InnerResult<F>
@@ -166,6 +176,29 @@ fn find_device(dev: DeviceSpecifier) -> Result<PathBuf, TestError> {
     }
 }
 
+pub enum RunResult {
+    Success,
+    Failure,
+}
+
+impl<E> From<InnerResult<E>> for RunResult {
+    fn from(value: InnerResult<E>) -> Self {
+        match value {
+            InnerResult::Success => RunResult::Success,
+            InnerResult::Failure(_) => RunResult::Failure,
+        }
+    }
+}
+
+impl Termination for RunResult {
+    fn report(self) -> std::process::ExitCode {
+        match self {
+            RunResult::Success => ExitCode::SUCCESS,
+            RunResult::Failure => ExitCode::FAILURE,
+        }
+    }
+}
+
 fn run_one_fd_test(test: &Test, path: &Path, f: fn(BorrowedFd<'_>) -> TestResult) -> TestResult {
     let file = match File::open(path) {
         Ok(f) => f,
@@ -191,7 +224,9 @@ fn run_one_fd_test(test: &Test, path: &Path, f: fn(BorrowedFd<'_>) -> TestResult
     f(file.as_fd())
 }
 
-pub fn run_all(dev: DeviceSpecifier) {
+pub fn run_all(dev: DeviceSpecifier) -> RunResult {
+    let mut result = TestResult::Success;
+
     let path = find_device(dev).unwrap();
 
     for (test_module, tests) in get_test_suites() {
@@ -211,13 +246,17 @@ pub fn run_all(dev: DeviceSpecifier) {
 
             match res {
                 TestResult::Success => writer.ok(num, test.test_name),
-                TestResult::Failure(e) => {
+                TestResult::Failure(ref e) => {
                     writer.not_ok(num, test.test_name);
                     writer.diagnostic(&e.to_string());
                 }
             }
+
+            result = result.and(res);
         }
 
         writer.plan(1, num);
     }
+
+    result.into()
 }

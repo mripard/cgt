@@ -7,10 +7,10 @@
 #![allow(clippy::unnecessary_wraps)]
 #![doc = include_str!("../README.md")]
 
-use cgt_core::{run_all, DeviceSpecifier};
+use cgt_core::{run_all, DeviceSpecifier, RunResult};
 
 mod tests;
 
-fn main() {
-    run_all(DeviceSpecifier::ModuleName(String::from("vkms")));
+fn main() -> RunResult {
+    run_all(DeviceSpecifier::ModuleName(String::from("vkms")))
 }
