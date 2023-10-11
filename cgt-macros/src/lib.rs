@@ -100,6 +100,7 @@ pub fn cgt_test(args: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+#[proc_macro_error]
 #[proc_macro_attribute]
 pub fn cgt_test_with_path(args: TokenStream, item: TokenStream) -> TokenStream {
     if !args.is_empty() {
