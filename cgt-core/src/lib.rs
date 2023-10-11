@@ -3,11 +3,11 @@ use std::{
     fs::File,
     os::fd::{AsFd, AsRawFd, BorrowedFd},
     path::{Path, PathBuf},
+    process::{ExitCode, Termination},
 };
 
 use drm_helpers::{set_client_capability, set_master};
 use glob::glob;
-use testanything::tap_writer::TapWriter;
 use thiserror::Error;
 
 use drm_uapi::{drm_ioctl_version, drm_version, ClientCapability};
@@ -61,9 +61,9 @@ impl From<nix::Error> for TestError {
 
 #[derive(Clone, Debug)]
 pub enum TestFunction {
-    NoArg(fn() -> Result<(), TestError>),
-    WithFd(fn(BorrowedFd) -> Result<(), TestError>),
-    WithPath(fn(&Path) -> Result<(), TestError>),
+    NoArg(fn() -> TestResult),
+    WithFd(fn(BorrowedFd) -> TestResult),
+    WithPath(fn(&Path) -> TestResult),
 }
 
 #[derive(Clone, Debug)]
@@ -73,6 +73,53 @@ pub struct Test {
     pub test_fn: TestFunction,
     pub master: bool,
     pub client_capabilities: [Option<ClientCapability>; 8],
+}
+
+#[derive(PartialEq)]
+pub enum InnerResult<E> {
+    Success,
+    Failure(E),
+}
+
+impl<E> InnerResult<E> {
+    pub fn and(self, res: InnerResult<E>) -> InnerResult<E> {
+        match self {
+            InnerResult::Success => res,
+            InnerResult::Failure(_) => self,
+        }
+    }
+}
+
+impl<U, E, F> From<Result<U, E>> for InnerResult<F>
+where
+    F: From<E>,
+{
+    fn from(value: Result<U, E>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(e) => Self::Failure(Into::<F>::into(e)),
+        }
+    }
+}
+
+pub type TestResult = InnerResult<TestError>;
+
+impl std::fmt::Debug for TestResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::Success => write!(f, "Success"),
+            Self::Failure(e) => write!(f, "Failure: {}", e),
+        }
+    }
+}
+
+pub trait TestResultWriter {
+    fn new() -> Self;
+    fn write_test(&mut self, test: &Test);
+    fn write_result(&mut self, test: &Test, res: &TestResult);
+
+    fn start_suite(&mut self, _name: &str, _tests: &[Test]) {}
+    fn end_suite(&mut self) {}
 }
 
 inventory::collect!(Test);
@@ -137,47 +184,78 @@ fn find_device(dev: DeviceSpecifier) -> Result<PathBuf, TestError> {
     }
 }
 
-pub fn run_all(dev: DeviceSpecifier) {
+pub enum RunResult {
+    Success,
+    Failure,
+}
+
+impl<E> From<InnerResult<E>> for RunResult {
+    fn from(value: InnerResult<E>) -> Self {
+        match value {
+            InnerResult::Success => RunResult::Success,
+            InnerResult::Failure(_) => RunResult::Failure,
+        }
+    }
+}
+
+impl Termination for RunResult {
+    fn report(self) -> std::process::ExitCode {
+        match self {
+            RunResult::Success => ExitCode::SUCCESS,
+            RunResult::Failure => ExitCode::FAILURE,
+        }
+    }
+}
+
+fn run_one_fd_test(test: &Test, path: &Path, f: fn(BorrowedFd<'_>) -> TestResult) -> TestResult {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => return TestResult::Failure(e.into()),
+    };
+
+    let fd = file.as_fd();
+    if test.master {
+        let res = set_master(fd);
+        if res.is_err() {
+            return res.into();
+        }
+    }
+
+    for cap in test.client_capabilities.into_iter().flatten() {
+        let res = set_client_capability(fd, cap);
+
+        if res.is_err() {
+            return res.into();
+        }
+    }
+
+    f(file.as_fd())
+}
+
+pub fn run_all(writer: &mut impl TestResultWriter, dev: DeviceSpecifier) -> RunResult {
+    let mut result = TestResult::Success;
+
     let path = find_device(dev).unwrap();
 
     for (test_module, tests) in get_test_suites() {
-        let writer = TapWriter::new(&test_module);
-        let mut num = 0;
-
-        writer.name();
+        writer.start_suite(&test_module, &tests);
 
         for test in tests {
-            num += 1;
+            writer.write_test(&test);
 
             let res = match test.test_fn {
                 TestFunction::NoArg(f) => f(),
-                TestFunction::WithFd(f) => {
-                    File::open(&path).map_err(|e| e.into()).and_then(|file| {
-                        let fd = file.as_fd();
-
-                        if test.master {
-                            set_master(fd)?;
-                        }
-
-                        for cap in test.client_capabilities.into_iter().flatten() {
-                            set_client_capability(fd, cap)?;
-                        }
-
-                        f(file.as_fd())
-                    })
-                }
+                TestFunction::WithFd(f) => run_one_fd_test(&test, &path, f),
                 TestFunction::WithPath(f) => f(&path),
             };
 
-            match res {
-                Ok(_) => writer.ok(num, test.test_name),
-                Err(e) => {
-                    writer.not_ok(num, test.test_name);
-                    writer.diagnostic(&e.to_string());
-                }
-            }
+            writer.write_result(&test, &res);
+
+            result = result.and(res);
         }
 
-        writer.plan(1, num);
+        writer.end_suite();
     }
+
+    result.into()
 }

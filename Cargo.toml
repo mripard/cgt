@@ -23,6 +23,7 @@ members = [
 automod = "1.0.12"
 cgt-core = { path = "cgt-core" }
 cgt-macros = { path = "cgt-macros" }
+colored = "2.0.4"
 drm-helpers = { path = "drm-helpers" }
 drm-uapi = { path = "drm-uapi" }
 inventory = "0.3.12"

@@ -1,5 +1,5 @@
 error: This macro doesn't use any attribute
- --> tests/trybuild/failures/cgt_test_path_attr.rs:1:24
+ --> tests/trybuild/failures/cgt_test_path_attr.rs:1:34
   |
-1 | #[cgt_macros::cgt_test(attribute)]
-  |                        ^^^^^^^^^
+1 | #[cgt_macros::cgt_test_with_path(attribute)]
+  |                                  ^^^^^^^^^
