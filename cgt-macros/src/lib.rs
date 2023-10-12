@@ -10,7 +10,7 @@ pub fn cgt_assert(item: TokenStream) -> TokenStream {
 
     quote! {
         if !(#input) {
-            return Err(TestError::ConditionUnmet(stringify!(#input).to_string()));
+            return cgt_core::TestResult::Failure(cgt_core::TestError::ConditionUnmet(stringify!(#input).to_string()));
         }
     }
     .into()
@@ -22,7 +22,7 @@ pub fn cgt_assert_err(item: TokenStream) -> TokenStream {
 
     quote! {
         if !(#input).is_err() {
-            return Err(TestError::ResultNotOk(format!("{:#?}", (#input))));
+            return cgt_core::TestResult::Failure(cgt_core::TestError::ResultNotOk(format!("{:#?}", (#input))));
         }
     }
     .into()
@@ -34,7 +34,7 @@ pub fn cgt_assert_ok(item: TokenStream) -> TokenStream {
 
     quote! {
         if !(#input).is_ok() {
-            return Err(TestError::ResultNotOk(format!("{:#?}", (#input))));
+            return cgt_core::TestResult::Failure(cgt_core::TestError::ResultNotOk(format!("{:#?}", (#input))));
         }
     }
     .into()
@@ -65,7 +65,7 @@ pub fn cgt_assert_eq(input: TokenStream) -> TokenStream {
 
     quote! {
         if (#left) != (#right) {
-            return Err(TestError::NotEqual(format!("{:#?}", #left), format!("{:#?}", #right)));
+            return cgt_core::TestResult::Failure(cgt_core::TestError::NotEqual(format!("{:#?}", #left), format!("{:#?}", #right)));
         }
     }
     .into()
