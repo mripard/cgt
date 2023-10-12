@@ -1,6 +1,10 @@
+#![feature(try_trait_v2)]
+
 use std::{
     collections::HashMap,
+    convert::Infallible,
     fs::File,
+    ops::{ControlFlow, FromResidual, Try},
     os::fd::{AsFd, AsRawFd, BorrowedFd},
     path::{Path, PathBuf},
     process::{ExitCode, Termination},
@@ -103,6 +107,37 @@ where
 }
 
 pub type TestResult = InnerResult<TestError>;
+
+impl Try for TestResult {
+    type Output = Self;
+    type Residual = Self;
+
+    fn from_output(output: Self::Output) -> Self {
+        output
+    }
+
+    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+        match self {
+            TestResult::Success => ControlFlow::Continue(self),
+            TestResult::Failure(e) => ControlFlow::Break(TestResult::Failure(e)),
+        }
+    }
+}
+
+impl FromResidual for TestResult {
+    fn from_residual(residual: Self) -> Self {
+        match residual {
+            TestResult::Failure(e) => TestResult::Failure(e),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<E: Into<TestError>> FromResidual<Result<Infallible, E>> for TestResult {
+    fn from_residual(_residual: Result<Infallible, E>) -> Self {
+        todo!()
+    }
+}
 
 impl std::fmt::Debug for TestResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
