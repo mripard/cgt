@@ -1,5 +1,5 @@
 #[cgt_macros::cgt_test(attribute)]
-fn test() -> cgt_core::TestResult {
+fn test() -> Result<(), cgt_core::TestError> {
     Ok(())
 }
 

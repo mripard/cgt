@@ -1,6 +1,6 @@
 use super::prelude::*;
 
 #[cgt_test]
-fn test_dummy() -> TestResult {
-    TestResult::Success
+fn test_dummy() -> Result<(), TestError> {
+    Ok(())
 }
