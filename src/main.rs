@@ -9,7 +9,7 @@
 
 use colored::Colorize;
 
-use cgt_core::{run_all, DeviceSpecifier, RunResult, Test, TestError, TestResultWriter};
+use cgt_core::{run_all, DeviceSpecifier, RunResult, Test, TestResult, TestResultWriter};
 
 mod tests;
 
@@ -34,13 +34,13 @@ impl TestResultWriter for ConsoleResultWriter {
         self.num_tests += 1;
     }
 
-    fn write_result(&mut self, _test: &Test, res: &Result<(), TestError>) {
+    fn write_result(&mut self, _test: &Test, res: &TestResult) {
         match res {
-            Ok(()) => {
+            TestResult::Success => {
                 println!("\t{}", "✔".green().bold());
                 self.successful_tests += 1;
             }
-            Err(e) => {
+            TestResult::Failure(e) => {
                 println!("\t{}", format!("✘ -> {e}").red().bold());
                 self.failing_tests += 1;
             }

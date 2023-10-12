@@ -1,6 +1,10 @@
+#![feature(try_trait_v2)]
+
 use std::{
     collections::HashMap,
+    convert::Infallible,
     fs::File,
+    ops::{ControlFlow, FromResidual, Try},
     os::fd::{AsFd, AsRawFd, BorrowedFd},
     path::{Path, PathBuf},
     process::{ExitCode, Termination},
@@ -61,9 +65,9 @@ impl From<nix::Error> for TestError {
 
 #[derive(Clone, Debug)]
 pub enum TestFunction {
-    NoArg(fn() -> Result<(), TestError>),
-    WithFd(fn(BorrowedFd) -> Result<(), TestError>),
-    WithPath(fn(&Path) -> Result<(), TestError>),
+    NoArg(fn() -> TestResult),
+    WithFd(fn(BorrowedFd) -> TestResult),
+    WithPath(fn(&Path) -> TestResult),
 }
 
 #[derive(Clone, Debug)]
@@ -75,10 +79,79 @@ pub struct Test {
     pub client_capabilities: [Option<ClientCapability>; 8],
 }
 
+#[derive(PartialEq)]
+pub enum InnerResult<E> {
+    Success,
+    Failure(E),
+}
+
+impl<E> InnerResult<E> {
+    pub fn and(self, res: InnerResult<E>) -> InnerResult<E> {
+        match self {
+            InnerResult::Success => res,
+            InnerResult::Failure(_) => self,
+        }
+    }
+}
+
+impl<U, E, F> From<Result<U, E>> for InnerResult<F>
+where
+    F: From<E>,
+{
+    fn from(value: Result<U, E>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(e) => Self::Failure(Into::<F>::into(e)),
+        }
+    }
+}
+
+pub type TestResult = InnerResult<TestError>;
+
+impl Try for TestResult {
+    type Output = Self;
+    type Residual = Self;
+
+    fn from_output(output: Self::Output) -> Self {
+        output
+    }
+
+    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+        match self {
+            TestResult::Success => ControlFlow::Continue(self),
+            TestResult::Failure(e) => ControlFlow::Break(TestResult::Failure(e)),
+        }
+    }
+}
+
+impl FromResidual for TestResult {
+    fn from_residual(residual: Self) -> Self {
+        match residual {
+            TestResult::Failure(e) => TestResult::Failure(e),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<E: Into<TestError>> FromResidual<Result<Infallible, E>> for TestResult {
+    fn from_residual(_residual: Result<Infallible, E>) -> Self {
+        todo!()
+    }
+}
+
+impl std::fmt::Debug for TestResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::Success => write!(f, "Success"),
+            Self::Failure(e) => write!(f, "Failure: {}", e),
+        }
+    }
+}
+
 pub trait TestResultWriter {
     fn new() -> Self;
     fn write_test(&mut self, test: &Test);
-    fn write_result(&mut self, test: &Test, res: &Result<(), TestError>);
+    fn write_result(&mut self, test: &Test, res: &TestResult);
 
     fn start_suite(&mut self, _name: &str, _tests: &[Test]) {}
     fn end_suite(&mut self) {}
@@ -151,11 +224,11 @@ pub enum RunResult {
     Failure,
 }
 
-impl<U, E> From<Result<U, E>> for RunResult {
-    fn from(value: Result<U, E>) -> Self {
+impl<E> From<InnerResult<E>> for RunResult {
+    fn from(value: InnerResult<E>) -> Self {
         match value {
-            Ok(_) => RunResult::Success,
-            Err(_) => RunResult::Failure,
+            InnerResult::Success => RunResult::Success,
+            InnerResult::Failure(_) => RunResult::Failure,
         }
     }
 }
@@ -169,8 +242,33 @@ impl Termination for RunResult {
     }
 }
 
+fn run_one_fd_test(test: &Test, path: &Path, f: fn(BorrowedFd<'_>) -> TestResult) -> TestResult {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => return TestResult::Failure(e.into()),
+    };
+
+    let fd = file.as_fd();
+    if test.master {
+        let res = set_master(fd);
+        if res.is_err() {
+            return res.into();
+        }
+    }
+
+    for cap in test.client_capabilities.into_iter().flatten() {
+        let res = set_client_capability(fd, cap);
+
+        if res.is_err() {
+            return res.into();
+        }
+    }
+
+    f(file.as_fd())
+}
+
 pub fn run_all(writer: &mut impl TestResultWriter, dev: DeviceSpecifier) -> RunResult {
-    let mut result = Ok(());
+    let mut result = TestResult::Success;
 
     let path = find_device(dev).unwrap();
 
@@ -182,21 +280,7 @@ pub fn run_all(writer: &mut impl TestResultWriter, dev: DeviceSpecifier) -> RunR
 
             let res = match test.test_fn {
                 TestFunction::NoArg(f) => f(),
-                TestFunction::WithFd(f) => {
-                    File::open(&path).map_err(|e| e.into()).and_then(|file| {
-                        let fd = file.as_fd();
-
-                        if test.master {
-                            set_master(fd)?;
-                        }
-
-                        for cap in test.client_capabilities.into_iter().flatten() {
-                            set_client_capability(fd, cap)?;
-                        }
-
-                        f(file.as_fd())
-                    })
-                }
+                TestFunction::WithFd(f) => run_one_fd_test(&test, &path, f),
                 TestFunction::WithPath(f) => f(&path),
             };
 
