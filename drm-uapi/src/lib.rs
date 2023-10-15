@@ -11,6 +11,7 @@ const DRM_IOCTL_ATTACH_MODE: u32 = 0xa8;
 const DRM_IOCTL_DETACH_MODE: u32 = 0xa9;
 const DRM_IOCTL_MODE_GETPLANERESOURCES: u32 = 0xb5;
 const DRM_IOCTL_MODE_GETPLANE: u32 = 0xb6;
+const DRM_IOCTL_MODE_OBJ_GETPROPERTIES: u32 = 0xb9;
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -110,4 +111,21 @@ ioctl_readwrite!(
     DRM_IOCTL_BASE,
     DRM_IOCTL_MODE_GETPLANE,
     drm_mode_get_plane
+);
+
+#[repr(C)]
+#[derive(Default, Debug)]
+pub struct drm_mode_obj_get_properties {
+    pub props_ptr: u64,
+    pub prop_values_ptr: u64,
+    pub count_props: u32,
+    pub obj_id: u32,
+    pub obj_type: u32,
+}
+
+ioctl_readwrite!(
+    drm_ioctl_mode_obj_getproperties,
+    DRM_IOCTL_BASE,
+    DRM_IOCTL_MODE_OBJ_GETPROPERTIES,
+    drm_mode_obj_get_properties
 );
