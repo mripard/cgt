@@ -1,8 +1,12 @@
-use std::os::fd::{AsRawFd, BorrowedFd};
+use std::{
+    iter::zip,
+    os::fd::{AsRawFd, BorrowedFd},
+};
 
 use drm_uapi::{
-    drm_ioctl_drop_master, drm_ioctl_mode_getplaneresources, drm_ioctl_set_client_cap,
-    drm_ioctl_set_master, drm_mode_get_plane_res, drm_setclientcap, ClientCapability,
+    drm_ioctl_drop_master, drm_ioctl_mode_getplaneresources, drm_ioctl_mode_obj_getproperties,
+    drm_ioctl_set_client_cap, drm_ioctl_set_master, drm_mode_get_plane_res,
+    drm_mode_obj_get_properties, drm_setclientcap, ClientCapability,
 };
 use strum::IntoEnumIterator;
 
@@ -71,4 +75,37 @@ pub fn find_planes(dev: BorrowedFd<'_>) -> Result<impl Iterator<Item = u32>, std
     }
 
     Ok(plane_ids.into_iter())
+}
+
+pub fn find_properties_for_object(
+    dev: BorrowedFd<'_>,
+    obj_id: u32,
+) -> Result<impl Iterator<Item = (u32, u64)>, std::io::Error> {
+    let mut count = drm_mode_obj_get_properties {
+        obj_id,
+
+        ..Default::default()
+    };
+
+    unsafe { drm_ioctl_mode_obj_getproperties(dev.as_raw_fd(), &mut count) }?;
+
+    let mut prop_ids: Vec<u32> = Vec::with_capacity(count.count_props as usize);
+    let mut prop_values: Vec<u64> = Vec::with_capacity(count.count_props as usize);
+
+    let mut props = drm_mode_obj_get_properties {
+        obj_id,
+        count_props: count.count_props,
+        props_ptr: prop_ids.as_mut_ptr() as u64,
+        prop_values_ptr: prop_values.as_mut_ptr() as u64,
+
+        ..Default::default()
+    };
+
+    unsafe {
+        drm_ioctl_mode_obj_getproperties(dev.as_raw_fd(), &mut props)?;
+        prop_ids.set_len(props.count_props as usize);
+        prop_values.set_len(props.count_props as usize);
+    };
+
+    Ok(zip(prop_ids, prop_values))
 }
