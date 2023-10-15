@@ -1,8 +1,8 @@
 use std::os::fd::{AsRawFd, BorrowedFd};
 
 use drm_uapi::{
-    drm_ioctl_drop_master, drm_ioctl_set_client_cap, drm_ioctl_set_master, drm_setclientcap,
-    ClientCapability,
+    drm_ioctl_drop_master, drm_ioctl_mode_getplaneresources, drm_ioctl_set_client_cap,
+    drm_ioctl_set_master, drm_mode_get_plane_res, drm_setclientcap, ClientCapability,
 };
 use strum::IntoEnumIterator;
 
@@ -50,4 +50,25 @@ pub fn clear_client_capabilities(fd: BorrowedFd<'_>) -> Result<(), std::io::Erro
     }
 
     Ok(())
+}
+
+pub fn find_planes(dev: BorrowedFd<'_>) -> Result<impl Iterator<Item = u32>, std::io::Error> {
+    let mut count = drm_mode_get_plane_res::default();
+
+    unsafe { drm_ioctl_mode_getplaneresources(dev.as_raw_fd(), &mut count) }?;
+
+    let mut plane_ids: Vec<u32> = Vec::with_capacity(count.count_planes as usize);
+
+    let mut ids = drm_mode_get_plane_res {
+        count_planes: count.count_planes,
+        plane_id_ptr: plane_ids.as_mut_ptr() as u64,
+    };
+
+    unsafe {
+        drm_ioctl_mode_getplaneresources(dev.as_raw_fd(), &mut ids)?;
+
+        plane_ids.set_len(ids.count_planes as usize);
+    }
+
+    Ok(plane_ids.into_iter())
 }
