@@ -9,9 +9,12 @@ const DRM_IOCTL_SET_MASTER: u32 = 0x1e;
 const DRM_IOCTL_DROP_MASTER: u32 = 0x1f;
 const DRM_IOCTL_ATTACH_MODE: u32 = 0xa8;
 const DRM_IOCTL_DETACH_MODE: u32 = 0xa9;
+const DRM_IOCTL_MODE_GET_PROPERTY: u32 = 0xaa;
 const DRM_IOCTL_MODE_GETPLANERESOURCES: u32 = 0xb5;
 const DRM_IOCTL_MODE_GETPLANE: u32 = 0xb6;
 const DRM_IOCTL_MODE_OBJ_GETPROPERTIES: u32 = 0xb9;
+
+const DRM_PROP_NAME_LEN: usize = 32;
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -79,6 +82,25 @@ ioctl_none!(drm_ioctl_drop_master, DRM_IOCTL_BASE, DRM_IOCTL_DROP_MASTER);
 ioctl_none!(drm_ioctl_attach_mode, DRM_IOCTL_BASE, DRM_IOCTL_ATTACH_MODE);
 
 ioctl_none!(drm_ioctl_detach_mode, DRM_IOCTL_BASE, DRM_IOCTL_DETACH_MODE);
+
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct drm_mode_get_property {
+    pub values_ptr: u64,
+    pub enum_blob_ptr: u64,
+    pub prop_id: u32,
+    pub flags: u32,
+    pub name: [u8; DRM_PROP_NAME_LEN],
+    pub count_values: u32,
+    pub count_enum_blobs: u32,
+}
+
+ioctl_readwrite!(
+    drm_ioctl_mode_get_property,
+    DRM_IOCTL_BASE,
+    DRM_IOCTL_MODE_GET_PROPERTY,
+    drm_mode_get_property
+);
 
 #[repr(C)]
 #[derive(Debug, Default)]
