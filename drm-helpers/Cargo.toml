@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 drm-uapi = { path = "../drm-uapi" }
-strum = "0.25.0"
+strum = "0.26.1"
