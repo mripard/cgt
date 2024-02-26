@@ -10,5 +10,5 @@ drm-helpers = { path = "../drm-helpers" }
 drm-uapi = { path = "../drm-uapi" }
 glob = "0.3.1"
 inventory = "0.3.12"
-nix = "0.27.1"
+nix = "0.28.0"
 thiserror = "1.0.49"
